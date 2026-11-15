@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COA Von Neumann &amp; Cache Architecture Studio</title>
+<style>
+  :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --accent:#38bdf8; --accent-dk:#0284c7; --ok:#34d399; --bad:#f87171; --mut:#94a3b8; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: #f8fafc; margin: 0; padding: 20px; }
+  .container { max-width: 960px; margin: 0 auto; }
+  header { text-align: center; border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 20px; }
+  h1 { color: var(--accent); margin: 0 0 6px; font-size: 1.6rem; }
+  h2 { margin-top: 0; font-size: 1.2rem; }
+  .subtitle { color: var(--mut); font-size: .9rem; margin: 0 0 12px; }
+  .score-pill { display: inline-block; background: var(--panel); border: 1px solid var(--line); padding: 4px 14px; border-radius: 999px; font-family: monospace; color: var(--ok); font-weight: bold; }
+  .tabs { display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+  .tab-btn { background: var(--panel); color: #cbd5e1; border: 1px solid var(--line); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .tab-btn.active { background: var(--accent-dk); color: #fff; border-color: var(--accent); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .hidden { display: none; }
+  .reg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 16px 0; }
+  .reg-box { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; text-align: center; }
+  .reg-label { font-size: .75rem; color: var(--mut); font-weight: bold; }
+  .reg-val { font-family: monospace; font-size: 1.25rem; color: var(--accent); font-weight: bold; margin-top: 4px; }
+  .mem-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin: 12px 0; }
+  .mem-cell { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px; text-align: center; font-family: monospace; font-size: .8rem; }
+  .mem-cell small { display: block; color: var(--mut); }
+  .mem-cell.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-family: monospace; font-size: .9rem; }
+  th, td { border: 1px solid var(--line); padding: 8px; text-align: center; }
+  th { background: var(--bg); color: var(--accent); }
+  tr.hit td { color: var(--ok); }
+  tr.miss td { color: var(--bad); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+  label { color: var(--mut); font-size: .85rem; }
+  .btn-action, .btn-reset { border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+  .btn-action { background: var(--accent-dk); color: #fff; }
+  .btn-reset { background: var(--line); color: #f8fafc; }
+  .log-box { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-family: monospace; font-size: .85rem; color: #a7f3d0; margin-top: 14px; min-height: 60px; white-space: pre-wrap; }
+  input[type="number"], select { background: var(--bg); color: #f8fafc; border: 1px solid #475569; padding: 7px 10px; border-radius: 6px; font-family: monospace; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 12px; }
+  .next-op { font-family: monospace; color: #fde68a; margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>COA Von Neumann &amp; Cache Architecture Studio</h1>
+    <p class="subtitle">CSE 2009 / CSS 2257 &bull; Module-1 (Basic Computer Structure) &amp; Module-2 (ISA &amp; Memory Unit)</p>
+    <div class="score-pill">Architecture XP: <span id="xpScore">0</span> XP</div>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="1">1. Von Neumann CPU Cycle (Mod-1)</button>
+      <button class="tab-btn" data-tab="2">2. Addressing Modes (Mod-2A)</button>
+      <button class="tab-btn" data-tab="3">3. Direct-Mapped Cache (Mod-2B)</button>
+    </nav>
+  </header>
+
+  <!-- TAB 1: MODULE 1 -->
+  <section id="tab1" class="panel">
+    <h2>Module 1: Instruction Fetch-Decode-Execute Simulator</h2>
+    <p>Program: <code>LOAD 0xA</code>, <code>ADD 0xB</code>, <code>STORE 0xC</code>. Each instruction executes in six clock cycles (T1&ndash;T6).</p>
+    <div class="reg-grid">
+      <div class="reg-box"><div class="reg-label">PC (Program Counter)</div><div class="reg-val" id="regPC">0x0</div></div>
+      <div class="reg-box"><div class="reg-label">MAR (Address Reg)</div><div class="reg-val" id="regMAR">0x0</div></div>
+      <div class="reg-box"><div class="reg-label">MDR (Data Reg)</div><div class="reg-val" id="regMDR">0x0000</div></div>
+      <div class="reg-box"><div class="reg-label">IR (Instruction Reg)</div><div class="reg-val" id="regIR">0x0000</div></div>
+      <div class="reg-box"><div class="reg-label">AC (Accumulator)</div><div class="reg-val" id="regAC">0</div></div>
+    </div>
+    <div class="reg-label">MAIN MEMORY (16 x 16-bit words)</div>
+    <div class="mem-grid" id="memGrid"></div>
+    <div class="next-op" id="nextOp"></div>
+    <div class="row">
+      <label for="predictOp">Predict next micro-operation (+100 XP if correct):</label>
+      <select id="predictOp"></select>
+    </div>
+    <div class="row">
+      <button class="btn-action" id="btnStep">Step Clock Cycle</button>
+      <button class="btn-action" id="btnRunInstr">Run Whole Instruction</button>
+      <button class="btn-reset" id="btnResetCpu">Reset CPU</button>
+    </div>
+    <div class="log-box" id="cpuLog"></div>
+    <table>
+      <thead><tr><th>Instruction</th><th>PC</th><th>MAR</th><th>MDR</th><th>IR</th><th>AC (dec)</th></tr></thead>
+      <tbody id="traceBody"></tbody>
+    </table>
+  </section>
+
+  <!-- TAB 2: MODULE 2A -->
+  <section id="tab2" class="panel hidden">
+    <h2>Module 2A: Addressing Mode Evaluator</h2>
+    <p>Data memory is fixed as shown below. Select a mode, an address field and (where relevant) the value of register R1.</p>
+    <div class="mem-grid" id="dataGrid"></div>
+    <div class="row">
+      <label for="modeSel">Mode</label>
+      <select id="modeSel">
+        <option value="imm">Immediate &mdash; LOAD #n</option>
+        <option value="dir">Direct &mdash; LOAD a</option>
+        <option value="ind">Indirect &mdash; LOAD (a)</option>
+        <option value="reg">Register &mdash; ADD R1</option>
+        <option value="idx">Indexed &mdash; LOAD a(R1)</option>
+      </select>
+      <label for="fieldIn">Address field</label>
+      <input type="number" id="fieldIn" min="0" max="4095" value="10">
+      <label for="r1In">R1</label>
+      <input type="number" id="r1In" min="0" max="4095" value="3">
+      <button class="btn-action" id="btnResolve">Resolve Operand</button>
+    </div>
+    <table>
+      <thead><tr><th>Syntax</th><th>EA Formula</th><th>EA</th><th>Operand</th><th>Memory Reads</th></tr></thead>
+      <tbody id="addrBody"></tbody>
+    </table>
+    <div class="log-box" id="addrLog">Choose a mode and press "Resolve Operand".</div>
+  </section>
+
+  <!-- TAB 3: MODULE 2B -->
+  <section id="tab3" class="panel hidden">
+    <h2>Module 2B: Direct-Mapped Cache Simulator (4 lines, 16 memory blocks)</h2>
+    <p>Line index = block mod 4 (bits B1B0). Tag = floor(block / 4) (bits B3B2).</p>
+    <div class="row">
+      <label for="blockIn">Block address (0&ndash;15)</label>
+      <input type="number" id="blockIn" min="0" max="15" value="0">
+      <label for="guessSel">Prediction (+50 XP)</label>
+      <select id="guessSel"><option value="">None</option><option value="HIT">HIT</option><option value="MISS">MISS</option></select>
+      <button class="btn-action" id="btnAccess">Access Block</button>
+      <button class="btn-action" id="btnBench">Run Benchmark [0, 4, 0, 8, 12, 12]</button>
+      <button class="btn-reset" id="btnResetCache">Reset Cache</button>
+    </div>
+    <div class="row">
+      <label for="hitTime">Hit time (ns)</label>
+      <input type="number" id="hitTime" min="0" step="0.1" value="1">
+      <label for="missPen">Miss penalty (ns)</label>
+      <input type="number" id="missPen" min="0" step="0.1" value="50">
+    </div>
+    <table>
+      <thead><tr><th>Line</th><th>Valid</th><th>Tag</th><th>Resident Block</th></tr></thead>
+      <tbody id="cacheBody"></tbody>
+    </table>
+    <div class="stats">
+      <div class="reg-box"><div class="reg-label">HITS</div><div class="reg-val" id="stHits">0</div></div>
+      <div class="reg-box"><div class="reg-label">MISSES</div><div class="reg-val" id="stMiss">0</div></div>
+      <div class="reg-box"><div class="reg-label">HIT RATIO</div><div class="reg-val" id="stRatio">&mdash;</div></div>
+      <div class="reg-box"><div class="reg-label">AMAT (ns)</div><div class="reg-val" id="stAmat">&mdash;</div></div>
+    </div>
+    <div class="log-box" id="cacheLog">Ready. All lines invalid (V = 0).</div>
+    <table>
+      <thead><tr><th>#</th><th>Block</th><th>Binary</th><th>Tag</th><th>Line</th><th>Outcome</th><th>Miss Class</th><th>Evicted</th></tr></thead>
+      <tbody id="histBody"></tbody>
+    </table>
+  </section>
+</div>
+
+<script>
+"use strict";
+(function () {
+  /* ---------- Shared helpers ---------- */
+  const $ = (id) => document.getElementById(id);
+  const hex = (v, w) => "0x" + v.toString(16).toUpperCase().padStart(w, "0");
+  const bin = (v, w) => v.toString(2).padStart(w, "0");
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Number.isFinite(v) ? Math.trunc(v) : lo));
+  let xp = 0;
+  function award(points) { xp += points; $("xpScore").textContent = xp; }
+
+  /* ================= MODEL 1: Von Neumann CPU ================= */
+  const OPS = { 0: "HALT", 1: "LOAD", 2: "ADD", 3: "STORE" };
+  const MICRO_OPS = [
+    "MAR \u2190 [PC]",
+    "MDR \u2190 Memory[MAR]; PC \u2190 [PC] + 1",
+    "IR \u2190 [MDR]",
+    "CU \u2190 Decode(IR[15:12]); MAR \u2190 IR[11:0]",
+    "MDR \u2190 Memory[MAR]",
+    "MDR \u2190 [AC]",
+    "AC \u2190 [MDR]",
+    "AC \u2190 [AC] + [MDR]",
+    "Memory[MAR] \u2190 [MDR]"
+  ];
+
+  class CpuModel {
+    constructor() { this.reset(); }
+    reset() {
+      this.mem = new Array(16).fill(0);
+      this.mem[0x0] = 0x100A;   // LOAD  0xA
+      this.mem[0x1] = 0x200B;   // ADD   0xB
+      this.mem[0x2] = 0x300C;   // STORE 0xC
+      this.mem[0xA] = 15;
+      this.mem[0xB] = 25;
+      this.pc = 0; this.mar = 0; this.mdr = 0; this.ir = 0; this.ac = 0;
+      this.t = 1; this.halted = false;
+    }
+    get op() { return this.ir >> 12; }
+    label() {
+      switch (this.t) {
+        case 1: return MICRO_OPS[0];
+        case 2: return MICRO_OPS[1];
+        case 3: return MICRO_OPS[2];
+        case 4: return MICRO_OPS[3];
+        case 5: return this.op === 3 ? MICRO_OPS[5] : MICRO_OPS[4];
+        default: return this.op === 1 ? MICRO_OPS[6] : this.op === 2 ? MICRO_OPS[7] : MICRO_OPS[8];
+      }
+    }
+    step() {
+      if (this.halted) return { halted: true };
+      const t = this.t;
+      let done = false;
+      switch (t) {
+        case 1: this.mar = this.pc; break;
+        case 2: this.mdr = this.mem[this.mar]; this.pc = (this.pc + 1) & 0xF; break;
+        case 3: this.ir = this.mdr; break;
+        case 4: {
+          const o = this.ir >> 12;
+          this.mar = this.ir & 0xFFF;
+          if (o === 0) { this.halted = true; return { halted: true }; }
+          if (!(o in OPS) || this.mar > 0xF) { this.halted = true; return { fault: true }; }
+          break;
+        }
+        case 5: this.mdr = this.op === 3 ? this.ac : this.mem[this.mar]; break;
+        case 6:
+          if (this.op === 1) this.ac = this.mdr;
+          else if (this.op === 2) this.ac = (this.ac + this.mdr) & 0xFFFF;
+          else this.mem[this.mar] = this.mdr;
+          done = true;
+          break;
+      }
+      this.t = t === 6 ? 1 : t + 1;
+      return { done };
+    }
+  }
+
+  /* ================= MODEL 2: Addressing modes ================= */
+  const DATA_MEM = [3, 7, 12, 5, 9, 21, 30, 8, 14, 2, 11, 6, 40, 1, 13, 4];
+  const MODES = {
+    imm: { syntax: (f) => `LOAD #${f}`,         formula: "Operand = Address Field" },
+    dir: { syntax: (f) => `LOAD ${hex(f, 2)}`,   formula: "EA = Address Field" },
+    ind: { syntax: (f) => `LOAD (${hex(f, 2)})`, formula: "EA = Mem[Address Field]" },
+    reg: { syntax: ()  => `ADD R1`,              formula: "Operand = [R1]" },
+    idx: { syntax: (f) => `LOAD ${hex(f, 2)}(R1)`, formula: "EA = Address Field + [R1]" }
+  };
+
+  function resolveOperand(mode, field, r1) {
+    const inRange = (a) => a >= 0 && a < DATA_MEM.length;
+    switch (mode) {
+      case "imm": return { ea: null, operand: field, reads: 0 };
+      case "reg": return { ea: null, operand: r1, reads: 0 };
+      case "dir":
+        if (!inRange(field)) return { error: `EA ${field} is outside the 16-word data memory.` };
+        return { ea: field, operand: DATA_MEM[field], reads: 1 };
+      case "ind": {
+        if (!inRange(field)) return { error: `Pointer address ${field} is outside the 16-word data memory.` };
+        const ea = DATA_MEM[field];
+        if (!inRange(ea)) return { error: `Pointer Mem[${field}] = ${ea} is outside the 16-word data memory.` };
+        return { ea, operand: DATA_MEM[ea], reads: 2 };
+      }
+      case "idx": {
+        const ea = field + r1;
+        if (!inRange(ea)) return { error: `EA = ${field} + ${r1} = ${ea} is outside the 16-word data memory.` };
+        return { ea, operand: DATA_MEM[ea], reads: 1 };
+      }
+    }
+    return { error: "Unknown addressing mode." };
+  }
+
+  /* ================= MODEL 3: Direct-mapped cache ================= */
+  const NUM_LINES = 4;
+  const FA_SHADOW_CAPACITY = NUM_LINES; // fully associative LRU reference for 3C classification
+
+  class CacheModel {
+    constructor() { this.reset(); }
+    reset() {
+      this.lines = Array.from({ length: NUM_LINES }, () => ({ v: 0, tag: 0, block: null }));
+      this.hits = 0; this.misses = 0;
+      this.seen = new Set();
+      this.shadow = [];   // LRU order, least recent first
+      this.history = [];
+    }
+    access(block) {
+      const index = block % NUM_LINES;
+      const tag = Math.floor(block / NUM_LINES);
+      const line = this.lines[index];
+      const hit = line.v === 1 && line.tag === tag;
+      const faHit = this.shadow.includes(block);
+
+      this.shadow = this.shadow.filter((b) => b !== block);
+      this.shadow.push(block);
+      if (this.shadow.length > FA_SHADOW_CAPACITY) this.shadow.shift();
+
+      let outcome = "HIT", missClass = "\u2014", evicted = null;
+      if (hit) {
+        this.hits++;
+      } else {
+        this.misses++;
+        outcome = "MISS";
+        missClass = !this.seen.has(block) ? "Compulsory" : faHit ? "Conflict" : "Capacity";
+        if (line.v === 1) evicted = line.block;
+        line.v = 1; line.tag = tag; line.block = block;
+      }
+      this.seen.add(block);
+      const rec = { n: this.history.length + 1, block, index, tag, outcome, missClass, evicted };
+      this.history.push(rec);
+      return rec;
+    }
+    get total() { return this.hits + this.misses; }
+  }
+
+  /* ================= Instances ================= */
+  const cpu = new CpuModel();
+  const cache = new CacheModel();
+  let cpuTrace = [];
+
+  /* ================= VIEW + CONTROLLER: Tab 1 ================= */
+  function renderCpu() {
+    $("regPC").textContent = hex(cpu.pc, 1);
+    $("regMAR").textContent = hex(cpu.mar, 1);
+    $("regMDR").textContent = hex(cpu.mdr, 4);
+    $("regIR").textContent = hex(cpu.ir, 4);
+    $("regAC").textContent = cpu.ac;
+    $("memGrid").innerHTML = cpu.mem.map((w, i) =>
+      `<div class="mem-cell${i === cpu.mar ? " active" : ""}"><small>${hex(i, 1)}</small>${hex(w, 4)}</div>`).join("");
+    $("nextOp").textContent = cpu.halted ? "CPU halted." : `Next: T${cpu.t} \u2014 ${cpu.label()}`;
+    $("traceBody").innerHTML = cpuTrace.map((r) =>
+      `<tr><td>${r.text}</td><td>${r.pc}</td><td>${r.mar}</td><td>${r.mdr}</td><td>${r.ir}</td><td>${r.ac}</td></tr>`).join("");
+  }
+
+  function stepCpu(scored) {
+    if (cpu.halted) { $("cpuLog").textContent = "CPU is halted. Press Reset CPU to restart."; return; }
+    const label = cpu.label(), t = cpu.t;
+    let msg = `T${t}: ${label}`;
+    const guess = $("predictOp").value;
+    if (scored && guess) {
+      if (guess === label) { award(100); msg += "\nPrediction correct (+100 XP)."; }
+      else msg += `\nPrediction incorrect (you chose: ${guess}).`;
+    }
+    const res = cpu.step();
+    if (res.halted) msg = "Opcode 0x0 decoded: HALT.";
+    if (res.fault) msg = "Fault: undefined opcode or address outside the 16-word memory.";
+    if (res.done) {
+      const o = cpu.op, a = cpu.ir & 0xFFF;
+      cpuTrace.push({ text: `${OPS[o]} ${hex(a, 1)}`, pc: hex(cpu.pc, 1), mar: hex(cpu.mar, 1),
+                      mdr: hex(cpu.mdr, 4), ir: hex(cpu.ir, 4), ac: cpu.ac });
+    }
+    $("predictOp").value = "";
+    $("cpuLog").textContent = msg;
+    renderCpu();
+  }
+
+  function runInstruction() {
+    for (let i = 0; i < 6 && !cpu.halted; i++) {
+      stepCpu(false);
+      if (cpu.t === 1) break;
+    }
+  }
+
+  function resetCpu() {
+    cpu.reset(); cpuTrace = [];
+    $("cpuLog").textContent = "Ready: Memory[0xA] = 15, Memory[0xB] = 25, Memory[0xC] = 0.";
+    renderCpu();
+  }
+
+  /* ================= VIEW + CONTROLLER: Tab 2 ================= */
+  function renderDataGrid() {
+    $("dataGrid").innerHTML = DATA_MEM.map((w, i) =>
+      `<div class="mem-cell"><small>${hex(i, 1)}</small>${w}</div>`).join("");
+  }
+
+  function resolveUi() {
+    const mode = $("modeSel").value;
+    const field = clamp(parseInt($("fieldIn").value, 10), 0, 4095);
+    const r1 = clamp(parseInt($("r1In").value, 10), 0, 4095);
+    const spec = MODES[mode];
+    const res = resolveOperand(mode, field, r1);
+    if (res.error) {
+      $("addrBody").innerHTML = "";
+      $("addrLog").textContent = "Error: " + res.error;
+      return;
+    }
+    $("addrBody").innerHTML =
+      `<tr><td>${spec.syntax(field)}</td><td>${spec.formula}</td><td>${res.ea === null ? "n/a" : hex(res.ea, 1)}</td>` +
+      `<td>${res.operand}</td><td>${res.reads}</td></tr>`;
+    const detail = {
+      imm: `Operand taken directly from the instruction: ${field}.`,
+      dir: `EA = ${field}; Mem[${field}] = ${res.operand}.`,
+      ind: `Pointer = Mem[${field}] = ${res.ea}; operand = Mem[${res.ea}] = ${res.operand}.`,
+      reg: `Operand = R1 = ${r1}. No memory access is needed.`,
+      idx: `EA = ${field} + R1 (${r1}) = ${res.ea}; operand = Mem[${res.ea}] = ${res.operand}.`
+    }[mode];
+    $("addrLog").textContent = detail;
+  }
+
+  /* ================= VIEW + CONTROLLER: Tab 3 ================= */
+  function renderCache() {
+    $("cacheBody").innerHTML = cache.lines.map((l, i) =>
+      `<tr><td>${i} (${bin(i, 2)})</td><td>${l.v}</td><td>${l.v ? bin(l.tag, 2) : "--"}</td>` +
+      `<td>${l.v ? "Block " + l.block : "\u2014"}</td></tr>`).join("");
+    $("stHits").textContent = cache.hits;
+    $("stMiss").textContent = cache.misses;
+    if (cache.total === 0) {
+      $("stRatio").textContent = "\u2014"; $("stAmat").textContent = "\u2014";
+    } else {
+      const hitTime = parseFloat($("hitTime").value) || 0;
+      const penalty = parseFloat($("missPen").value) || 0;
+      const missRate = cache.misses / cache.total;
+      $("stRatio").textContent = (100 * cache.hits / cache.total).toFixed(2) + "%";
+      $("stAmat").textContent = (hitTime + missRate * penalty).toFixed(2);
+    }
+    $("histBody").innerHTML = cache.history.map((r) =>
+      `<tr class="${r.outcome === "HIT" ? "hit" : "miss"}"><td>${r.n}</td><td>${r.block}</td><td>${bin(r.block, 4)}</td>` +
+      `<td>${bin(r.tag, 2)}</td><td>${r.index}</td><td>${r.outcome}</td><td>${r.missClass}</td>` +
+      `<td>${r.evicted === null ? "\u2014" : "Block " + r.evicted}</td></tr>`).join("");
+  }
+
+  function accessBlock(block, scored) {
+    const guess = $("guessSel").value;
+    const r = cache.access(block);
+    let msg = `Block ${block} (${bin(block, 4)}): tag ${bin(r.tag, 2)}, line ${r.index} -> ${r.outcome}` +
+              (r.outcome === "MISS" ? ` (${r.missClass} miss)` : "") + ".";
+    if (scored && guess) {
+      if (guess === r.outcome) { award(50); msg += "\nPrediction correct (+50 XP)."; }
+      else msg += `\nPrediction incorrect (you chose: ${guess}).`;
+    }
+    $("guessSel").value = "";
+    $("cacheLog").textContent = msg;
+    renderCache();
+  }
+
+  function runBenchmark() {
+    cache.reset();
+    [0, 4, 0, 8, 12, 12].forEach((b) => cache.access(b));
+    $("cacheLog").textContent = "Benchmark [0, 4, 0, 8, 12, 12] executed: expected 1 hit, 5 misses.";
+    renderCache();
+  }
+
+  /* ================= Wiring ================= */
+  function showTab(n) {
+    [1, 2, 3].forEach((i) => $("tab" + i).classList.toggle("hidden", i !== n));
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", Number(b.dataset.tab) === n));
+  }
+
+  document.querySelectorAll(".tab-btn").forEach((b) => b.addEventListener("click", () => showTab(Number(b.dataset.tab))));
+  $("btnStep").addEventListener("click", () => stepCpu(true));
+  $("btnRunInstr").addEventListener("click", runInstruction);
+  $("btnResetCpu").addEventListener("click", resetCpu);
+  $("btnResolve").addEventListener("click", resolveUi);
+  $("btnAccess").addEventListener("click", () => accessBlock(clamp(parseInt($("blockIn").value, 10), 0, 15), true));
+  $("btnBench").addEventListener("click", runBenchmark);
+  $("btnResetCache").addEventListener("click", () => { cache.reset(); $("cacheLog").textContent = "Cache reset. All lines invalid (V = 0)."; renderCache(); });
+  $("hitTime").addEventListener("input", renderCache);
+  $("missPen").addEventListener("input", renderCache);
+
+  $("predictOp").innerHTML = '<option value="">\u2014 no prediction \u2014</option>' +
+    MICRO_OPS.map((m) => `<option value="${m}">${m}</option>`).join("");
+
+  renderDataGrid();
+  resetCpu();
+  renderCache();
+})();
+</script>
+</body>
+</html>
